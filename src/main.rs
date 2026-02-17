@@ -25,10 +25,34 @@ impl <T> ZPool<T> {
         Some(idx)
     }
 
+
+    #[inline]
     fn release(mut self, idx: usize) {
         if idx > self.capacity { return }
         unsafe {self.storage[idx].assume_init_drop();}
         self.free_indices.push(idx);
+    }
+
+    #[inline]
+    fn mempool_length(self) -> usize {
+        self.free_indices.len()
+    }
+
+    #[inline(always)]
+    fn get(&self, idx: usize) {
+        if idx > self.capacity { return; }
+        unsafe { self.storage[idx].assume_init_ref();}
+    }
+
+    #[inline(always)]
+    fn get_mut(&mut self, idx: usize) {
+        debug_assert!(idx < self.capacity);
+        unsafe { self.storage[idx].assume_init_mut();}
+    }
+
+    #[inline]
+    fn capacity(self) -> usize {
+        self.capacity
     }
 }
 
