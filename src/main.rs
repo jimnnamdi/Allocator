@@ -1,5 +1,4 @@
 
-
 //! custom implementation of a minimal memory allocator
 //! here we pre allocate N objects at startup, preventing
 //! heap allocation on the hot paths, acquire and release
@@ -18,6 +17,18 @@ impl <T> ZPool<T> {
         let storage: Vec<MaybeUninit<T>> = (0..val).map(|v| MaybeUninit::uninit()).collect();
         let free_indexes = (0..val).rev().collect();
         Self { storage: storage.into_boxed_slice(), free_indices: free_indexes, capacity: val }
+    }
+
+    fn acquire(&mut self, val: T)  -> Option<usize>{
+        let idx = self.free_indices.pop()?;
+        self.storage[idx] = MaybeUninit::new(val);
+        Some(idx)
+    }
+
+    fn release(mut self, idx: usize) {
+        if idx > self.capacity { return }
+        unsafe {self.storage[idx].assume_init_drop();}
+        self.free_indices.push(idx);
     }
 }
 
