@@ -14,7 +14,7 @@ struct ZPool<T> {
 
 impl <T> ZPool<T> {
     fn new(val: usize) -> Self {
-        let storage: Vec<MaybeUninit<T>> = (0..val).map(|v| MaybeUninit::uninit()).collect();
+        let storage: Vec<MaybeUninit<T>> = (0..val).map(|_v| MaybeUninit::uninit()).collect();
         let free_indexes = (0..val).rev().collect();
         Self { storage: storage.into_boxed_slice(), free_indices: free_indexes, capacity: val }
     }
@@ -27,34 +27,49 @@ impl <T> ZPool<T> {
 
 
     #[inline]
-    fn release(mut self, idx: usize) {
+    fn release(&mut self, idx: usize) {
         if idx > self.capacity { return }
         unsafe {self.storage[idx].assume_init_drop();}
         self.free_indices.push(idx);
     }
 
     #[inline]
-    fn mempool_length(self) -> usize {
+    fn available(&self) -> usize {
         self.free_indices.len()
     }
 
     #[inline(always)]
-    fn get(&self, idx: usize) {
-        if idx > self.capacity { return; }
-        unsafe { self.storage[idx].assume_init_ref();}
+    fn get(&self, idx: usize) -> Option<&T> {
+        if idx >= self.capacity { return None; }
+        Some(unsafe { self.storage[idx].assume_init_ref()})
     }
 
     #[inline(always)]
-    fn get_mut(&mut self, idx: usize) {
+    fn get_mut(&mut self, idx: usize) -> Option<&mut T> {
         debug_assert!(idx < self.capacity);
-        unsafe { self.storage[idx].assume_init_mut();}
+        Some(unsafe { self.storage[idx].assume_init_mut()})
     }
 
     #[inline]
-    fn capacity(self) -> usize {
+    fn capacity(&self) -> usize {
         self.capacity
     }
 }
 
 
-fn main() {}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn acquire_and_get() {
+        let mut pool:ZPool<u64> = ZPool::new(5);
+
+        assert_eq!(pool.available(), 5);
+
+        let idx = pool.acquire(60).unwrap();
+
+        assert_eq!(*pool.get(idx).unwrap(), 60);
+        assert_eq!(pool.available(), 4);
+    }
+}
